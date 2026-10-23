@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Netheria — Movement Preview</title>
+<style>
+  * { box-sizing:border-box; }
+  html, body { margin:0; width:100%; height:100%; overflow:hidden; background:#080817; }
+  canvas { display:block; width:100vw; height:100dvh; image-rendering:pixelated; }
+  .hud{position:fixed;z-index:2;left:12px;top:12px;background:#040818e8;border:1px solid #43f5ff;padding:10px 12px;color:#e6fcff;font:bold 11px/1.6 Consolas,monospace;letter-spacing:.05em;text-transform:uppercase;box-shadow:0 0 14px #00dfff35}
+  .hud b{color:#43f5ff}.bar{height:5px;margin-top:6px;background:#10203a}.bar i{display:block;height:100%;width:0;background:#43f5ff;box-shadow:0 0 8px #43f5ff}
+  #touch{position:fixed;z-index:2;right:12px;bottom:12px;display:none;gap:8px}#touch button{background:#061526d9;color:#43f5ff;border:1px solid #43f5ff;padding:14px 18px;font:bold 16px Consolas}
+  @media(pointer:coarse){#touch{display:flex}}
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div class="hud"><b>NETHERIA // THE BRIDGE</b><br>Cross to the far tower · A / D or ← / →<div class="bar"><i id="prog"></i></div></div>
+<div id="touch"><button id="tl">◀</button><button id="tr">▶</button></div>
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  const bg = new Image();
+  bg.src = 'assets/netheria-background.png';
+
+  const sprites = {
+    idle: new Image(),
+    run: new Image()
+  };
+  sprites.idle.src = 'assets/ninja-idle.png';
+  sprites.run.src = 'assets/ninja-run.png';
+
+  const keys = new Set();
+  const player = { x:160, y:0, w:72, h:72, face:1, frame:0 };
+  let cameraX = 0;
+  const worldWidth = 2600;
+  let groundY = 0;
+  let lastTime = 0;
+  let elapsed = 0;
+  let finished = false, notified = false;
+  const prog = document.getElementById('prog');
+  [['tl','ArrowLeft'],['tr','ArrowRight']].forEach(([id,code]) => { const el = document.getElementById(id); el.addEventListener('pointerdown', e => { e.preventDefault(); keys.add(code); }); ['pointerup','pointercancel','pointerleave'].forEach(ev => el.addEventListener(ev, () => keys.delete(code))); });
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.floor(innerWidth * dpr);
+    canvas.height = Math.floor(innerHeight * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    // The bridge is already part of the provided background.
+    groundY = innerHeight * 0.92;
+    player.y = groundY - player.h;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  window.addEventListener('keydown', e => {
+    if (['ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
+    keys.add(e.code);
+  });
+  window.addEventListener('keyup', e => keys.delete(e.code));
+  window.addEventListener('blur', () => keys.clear());
+
+  function drawBackground(w, h) {
+    if (!bg.complete || !bg.naturalWidth) return;
+    // Fill the screen with the supplied panorama and pan it gently as the ninja moves.
+    const scale = Math.max(w / bg.naturalWidth, h / bg.naturalHeight);
+    const drawW = bg.naturalWidth * scale;
+    const drawH = bg.naturalHeight * scale;
+    const maxOffset = Math.max(0, drawW - w);
+    const progress = Math.max(0, Math.min(1, cameraX / Math.max(1, worldWidth - w)));
+    const offsetX = maxOffset * progress;
+    ctx.drawImage(bg, -offsetX, (h - drawH) / 2, drawW, drawH);
+  }
+
+  function drawSprite(img, screenX, screenY, width, height, frame, flip) {
+    if (!img.complete || !img.naturalWidth) return;
+    const count = Math.round(img.naturalWidth / 48);
+    const frameWidth = img.naturalWidth / count;
+    const index = Math.floor(frame) % count;
+    ctx.save();
+    if (flip) {
+      ctx.translate(screenX + width, 0);
+      ctx.scale(-1, 1);
+      screenX = 0;
+    }
+    ctx.drawImage(img, index * frameWidth, 0, frameWidth, img.naturalHeight,
+                  screenX, screenY, width, height);
+    ctx.restore();
+  }
+
+  function loop(now) {
+    const dt = Math.min((now - (lastTime || now)) / 1000, 0.04);
+    lastTime = now;
+    elapsed += dt;
+
+    const w = innerWidth, h = innerHeight;
+    ctx.clearRect(0, 0, w, h);
+    drawBackground(w, h);
+
+    let moving = false;
+    const speed = 280;
+    if (!finished && (keys.has('ArrowLeft') || keys.has('KeyA'))) {
+      player.x -= speed * dt;
+      player.face = -1;
+      moving = true;
+    }
+    if (!finished && (keys.has('ArrowRight') || keys.has('KeyD'))) {
+      player.x += speed * dt;
+      player.face = 1;
+      moving = true;
+    }
+    if (!finished && player.x >= worldWidth - player.w - 40) finished = true;
+    if (finished) {
+      // the ninja keeps running into the far tower while the next room loads
+      player.x += speed * dt; player.face = 1; moving = true;
+      if (!notified && player.x > worldWidth - player.w + 110) { notified = true; parent.postMessage({type:'netheria:complete',scene:'movement'},'*'); }
+    }
+    player.x = Math.max(0, Math.min(finished ? worldWidth + 300 : worldWidth - player.w, player.x));
+    prog.style.width = Math.min(100, player.x / (worldWidth - player.w) * 100) + '%';
+    player.y = groundY - player.h;
+    cameraX = Math.max(0, Math.min(worldWidth - w, player.x - w * 0.38));
+
+    player.frame += dt * (moving ? 12 : 5);
+    const sprite = moving ? sprites.run : sprites.idle;
+    const screenX = player.x - cameraX;
+    drawSprite(sprite, screenX, player.y, player.w, player.h, player.frame, player.face < 0);
+
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Netheria</title>
+<style>
+:root{--cyan:#43f5ff;--red:#ff315f;--ink:#050713;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--ink);color:#e6fcff;font-family:Consolas,"Share Tech Mono",monospace}
+#frame{position:fixed;inset:0;width:100%;height:100%;border:0;background:var(--ink)}
+
+/* full-screen overlays (title, transition, ending) */
+.screen{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;
+  background:radial-gradient(ellipse at center,#0b1030 0%,var(--ink) 70%);opacity:0;pointer-events:none;transition:opacity .7s ease}
+.screen.on{opacity:1;pointer-events:auto}
+.screen::before{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(67,245,255,.05) 0 1px,transparent 1px 4px)}
+.screen::after{content:"";position:absolute;left:0;right:0;height:22%;top:-25%;pointer-events:none;background:linear-gradient(180deg,transparent,rgba(67,245,255,.14),transparent);animation:sweep 2.2s linear infinite}
+@keyframes sweep{to{top:105%}}
+.kicker{color:var(--red);font-size:12px;letter-spacing:.35em;text-transform:uppercase}
+.big{margin:0;color:var(--cyan);font-size:clamp(28px,7vw,64px);letter-spacing:.18em;text-shadow:0 0 22px #43f5ff88,2px 0 var(--red),-2px 0 #3b5bff}
+.sub{max-width:520px;color:#bceef3;font-size:clamp(12px,1.6vw,15px);line-height:1.7}
+.btn{margin-top:10px;cursor:pointer;font:bold 14px Consolas,monospace;letter-spacing:.2em;text-transform:uppercase;color:var(--cyan);background:#061526;border:2px solid var(--cyan);padding:13px 22px;box-shadow:0 0 20px #00dfff55;animation:pulse 1.6s ease-in-out infinite}
+.btn:hover{background:#0a2a40}
+@keyframes pulse{50%{box-shadow:0 0 34px #00dfffaa}}
+.pips{display:flex;gap:8px;margin-top:6px}
+.pips i{width:34px;height:6px;background:#10203a;border:1px solid #1f4660}
+.pips i.done{background:var(--cyan);border-color:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+.pips i.now{border-color:var(--cyan);animation:blink .8s steps(2) infinite}
+@keyframes blink{50%{background:#43f5ff55}}
+.load{width:min(320px,70vw);height:4px;background:#10203a;margin-top:6px}
+.load i{display:block;height:100%;width:0;background:var(--cyan);box-shadow:0 0 10px var(--cyan)}
+.screen.on .load i{animation:fill 1.7s ease-out forwards}
+@keyframes fill{to{width:100%}}
+#hold{display:none}
+.screen.flash{background:#e6ffff;transition:opacity .35s ease}
+.screen.flash::before,.screen.flash::after{display:none}
+.screen.flash>*{visibility:hidden}
+.hint{position:absolute;bottom:6%;font-size:11px;letter-spacing:.14em;color:#6fb5c0;text-transform:uppercase}
+@media(prefers-reduced-motion:reduce){.screen::after,.btn{animation:none}}
+</style>
+</head>
+<body>
+<iframe id="frame" title="Netheria room" allow="fullscreen"></iframe>
+
+<!-- title -->
+<section id="title" class="screen on">
+  <div class="kicker">Network infiltration protocol</div>
+  <h1 class="big">NETHERIA</h1>
+  <p class="sub">Cross the bridge. Wire the Physical Layer. Crack the Transport Layer. Win the Packet Run. Finish each room to unlock the next.</p>
+  <button class="btn" id="start">▶ Begin</button>
+  <div class="hint">A / D or ← / → move · E interact · I field guide</div>
+</section>
+
+<!-- transition between rooms -->
+<section id="trans" class="screen">
+  <div class="kicker" id="tKick">Room 02 / 03</div>
+  <h2 class="big" id="tTitle" style="font-size:clamp(24px,5.5vw,48px)">TRANSPORT LAYER</h2>
+  <p class="sub" id="tSub">Establish a trusted connection.</p>
+  <div class="pips" id="tPips"></div>
+  <div class="load"><i></i></div>
+</section>
+
+<!-- ending -->
+<section id="end" class="screen">
+  <div class="kicker">All rooms cleared</div>
+  <h2 class="big">NETWORK RESTORED</h2>
+  <p class="sub">The bridge is crossed, every topology is wired into the core and the handshake is complete and TCP and UDP are mastered. Netheria is back online.</p>
+  <div class="pips" id="ePips"></div>
+  <button class="btn" id="again">↺ Play again</button>
+</section>
+
+<script>
+(() => {
+  const ROOMS = [
+    { key:'movement',  src:'scenes/movement/index.html',  title:'THE BRIDGE',      sub:'Run across the bridge to the far tower.' },
+    { key:'tower',     src:'scenes/tower/index.html',     title:'THE CITADEL',     sub:'A tower rises out of the network. The Physical Layer waits inside.', cut:true },
+    { key:'physical',  src:'scenes/physical/index.html',  title:'PHYSICAL LAYER',  sub:'Wire the five topologies, then link them all through the Core Gate.', quick:true },
+    { key:'transport', src:'scenes/transport/index.html', title:'TRANSPORT LAYER', sub:'The vault is sealed. Establish a trusted TCP connection: SYN, SYN-ACK, ACK.' },
+    { key:'packets',   src:'scenes/packets/index.html',   title:'PACKET RUN',      sub:'UDP fires fast. TCP delivers every byte. Race the packets, then route each request to the right protocol.' }
+  ];
+  const TOTAL = ROOMS.filter(r => !r.cut).length;
+  const before = i => ROOMS.slice(0, i).filter(r => !r.cut).length;
+  const $ = s => document.querySelector(s);
+  const frame = $('#frame'), trans = $('#trans'), title = $('#title'), end = $('#end');
+  let current = -1, busy = false;
+
+  const pips = (el, n) => el.innerHTML = Array.from({length:TOTAL}, (_, i) => `<i class="${i < n ? 'done' : i === n ? 'now' : ''}"></i>`).join('');
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const focusRoom = () => { try { frame.contentWindow.focus(); } catch (e) {} };
+
+  function loadRoom(i) {
+    return new Promise(res => {
+      frame.onload = () => res();
+      frame.src = ROOMS[i].src;
+    });
+  }
+
+  async function goTo(i, first) {
+    if (busy) return; busy = true;
+    const room = ROOMS[i];
+    // cover the screen
+    const quick = !!room.quick;
+    trans.classList.toggle('flash', quick);
+    $('#tKick').textContent = room.cut ? 'Cutscene' : `Room 0${before(i) + 1} / 0${TOTAL}`;
+    $('#tTitle').textContent = room.title;
+    $('#tSub').textContent = room.sub;
+    pips($('#tPips'), before(i));
+    trans.classList.remove('on'); void trans.offsetWidth;
+    trans.classList.add('on');
+    if (first) title.classList.remove('on');
+    await wait(quick ? 400 : 750);
+    // swap rooms behind the cover (old room is discarded)
+    frame.src = 'about:blank';
+    await Promise.all([loadRoom(i), wait(quick ? 500 : 1800)]);
+    current = i;
+    trans.classList.remove('on');
+    await wait(quick ? 400 : 700);
+    focusRoom();
+    busy = false;
+  }
+
+  async function finish() {
+    if (busy) return; busy = true;
+    pips($('#ePips'), TOTAL);
+    end.classList.add('on');
+    await wait(800);
+    frame.src = 'about:blank';
+    busy = false;
+  }
+
+  // rooms tell us when they are complete
+  addEventListener('message', e => {
+    const d = e.data;
+    if (!d || d.type !== 'netheria:complete' || e.source !== frame.contentWindow) return;
+    if (!ROOMS[current] || d.scene !== ROOMS[current].key || busy) return;
+    current + 1 < ROOMS.length ? goTo(current + 1) : finish();
+  });
+
+  $('#start').onclick = () => goTo(0, true);
+  $('#again').onclick = () => { end.classList.remove('on'); setTimeout(() => goTo(0), 400); };
+
+  // keep keyboard focus inside the active room if the player clicks outside it
+  addEventListener('focus', focusRoom);
+  addEventListener('keydown', e => { if (current >= 0 && !busy && document.activeElement !== frame) focusRoom(); });
+
+  // jump straight to a room for testing: index.html?room=tower (names: movement, tower, physical, transport) or 1-4
+  const rq = new URLSearchParams(location.search).get('room');
+  const qi = rq ? (isNaN(rq) ? ROOMS.findIndex(r => r.key === rq) : parseInt(rq, 10) - 1) : -1;
+  if (qi >= 0 && qi < ROOMS.length) { title.classList.remove('on'); goTo(qi, true); }
+})();
+</script>
+</body>
+</html>

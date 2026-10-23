@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Netheria — Packet Run</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Silkscreen:wght@700&display=swap" rel="stylesheet">
+<style>
+:root{--cy:#43f5ff;--red:#ff315f;--ink:#050713;--ok:#75ffcf;--am:#ffd24d;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;color:#e6fcff;font:14px 'Share Tech Mono',Consolas,monospace}
+body{min-height:100dvh;background:linear-gradient(#050713cc,#050713f0),url(assets/transport-room.png) center/cover fixed #050713;display:flex;flex-direction:column;align-items:center;gap:10px;padding:10px}
+.w{width:min(100%,1000px)}
+.box{border:1px solid var(--cy);background:#040818e8;box-shadow:0 0 14px #00dfff35;padding:10px 12px}
+.hud{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ttl{font:700 14px Silkscreen,monospace;color:var(--cy)}.sp{flex:1}
+#pips{display:flex;gap:5px}#pips i{width:26px;height:8px;background:#10203a;border:1px solid #1f4660}
+#pips i.on{background:var(--cy);box-shadow:0 0 8px var(--cy)}#pips i.now{animation:bl .8s steps(2) infinite}
+@keyframes bl{50%{background:#43f5ff55}}
+button{font:inherit;color:var(--cy);background:#061526;border:1px solid var(--cy);padding:9px 14px;cursor:pointer;text-transform:uppercase;letter-spacing:.06em;touch-action:manipulation}
+button:hover:not(:disabled){background:#0a2a40}button:disabled{opacity:.35;cursor:default}
+#info{width:32px;height:32px;padding:0;border-radius:50%;font-weight:bold;font-size:17px;box-shadow:0 0 10px #43f5ff40}
+.stage{position:relative;height:clamp(240px,40vh,340px);border:1px solid #1f4660;background:#040818b0;overflow:hidden}
+.node{position:absolute;bottom:14%;width:84px;height:84px;border:2px solid var(--cy);background:#061526;display:grid;place-items:center;text-align:center;font-size:11px;line-height:1.4;box-shadow:0 0 16px #00dfff44}
+#cl{left:12px}#sv{right:12px;border-color:var(--red);box-shadow:0 0 16px #ff315f55}
+.cable{position:absolute;left:96px;right:96px;bottom:calc(14% + 40px);height:6px;background:#10304a;box-shadow:0 0 10px #43f5ff66}
+#lane{position:absolute;left:108px;right:108px;top:0;bottom:0}
+.noise{position:absolute;left:45%;width:12%;bottom:calc(14% + 8px);height:70px;border:1px dashed var(--red);background:repeating-linear-gradient(90deg,#ff315f30 0 4px,transparent 4px 9px);animation:fl .3s steps(2) infinite;font-size:9px;color:var(--red);text-align:center;padding-top:2px}
+@keyframes fl{50%{opacity:.45}}
+.pk{position:absolute;bottom:calc(14% + 28px);transform:translate(-50%,var(--y,0));min-width:26px;padding:3px 5px;font-size:11px;font-weight:bold;text-align:center;background:#061a2c;border:1px solid var(--cy);color:var(--cy);box-shadow:0 0 8px var(--cy)}
+.pk.ack{border-color:var(--ok);color:var(--ok);box-shadow:0 0 8px var(--ok);font-size:9px}
+.pk.x{border-color:var(--red);color:var(--red);box-shadow:0 0 16px var(--red);animation:bm .4s forwards}
+@keyframes bm{to{transform:translate(-50%,calc(var(--y,0px) - 26px)) scale(1.9);opacity:0}}
+.ninja{position:absolute;left:12px;bottom:calc(14% + 82px);width:84px;height:84px;image-rendering:pixelated;background-repeat:no-repeat;background-size:calc(var(--n,6)*100%) 100%;animation:spr 1s steps(var(--n,6),jump-none) infinite}
+@keyframes spr{from{background-position-x:0%}to{background-position-x:100%}}
+#sortbox{position:absolute;inset:8px;z-index:4;background:#040818f5;border:1px solid var(--cy);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:10px}
+#sq{font:700 clamp(15px,3.4vw,24px) Silkscreen,monospace;color:var(--cy)}#sa{min-height:44px;font-size:13px;line-height:1.5;max-width:560px}
+#sb{display:flex;gap:12px}#sb button{min-width:120px;font-size:16px;padding:14px}#sb button.u{border-color:var(--red);color:var(--red)}
+.panel{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}
+#stat{font-size:12px;letter-spacing:.04em}#fb{min-height:20px;font-size:12px;margin-top:4px}
+.good{color:var(--ok)}.bad{color:#ff819a}
+#cp{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;min-height:30px;align-items:center}#cp small{color:#7fb7c1;margin-right:4px}
+.c{padding:4px 8px;border:1px solid #3e6676;min-width:30px;text-align:center;font-size:12px}
+.c.ok{border-color:var(--ok);color:var(--ok)}.c.fly{border-color:var(--am);color:var(--am)}.c.ooo{border-color:#ffb347;color:#ffb347}
+.c.to{border-color:var(--red);color:var(--red);animation:bl .5s steps(2) infinite;cursor:pointer}
+#ctl{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+#send{border-color:var(--red);color:#fff;background:#3a0d1c;padding:14px 20px;font-weight:bold}
+#retx{display:none}body[data-m="2"] #retx{display:block}
+body[data-m="3"] #ctl{display:none}body:not([data-m="3"]) #sortbox{display:none}
+.hint{font-size:11px;color:#7fb7c1;text-align:center}
+/* overlay + book */
+#ov,#bk{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;padding:14px;background:#01050dc0;backdrop-filter:blur(6px)}
+#ov.on,#bk.on{display:flex}
+.card{width:min(560px,100%);max-height:92dvh;overflow:auto;border:2px solid var(--cy);background:#05091bf5;box-shadow:0 0 36px #00dfff55;padding:clamp(16px,3vw,26px);text-align:center}
+.k{color:var(--red);font-size:11px;letter-spacing:.3em;text-transform:uppercase}
+.card h2{font:700 clamp(17px,3.4vw,24px) Silkscreen,monospace;color:var(--cy);margin:8px 0 12px;text-shadow:0 0 14px #43f5ff88}
+.card p{line-height:1.65;font-size:13px;color:#bceef3;margin:0 0 12px}
+#book{width:min(860px,100%);height:min(92dvh,640px);display:flex;flex-direction:column;border:1px solid #43f5ffb8;background:linear-gradient(135deg,#041526d0,#030816c0);box-shadow:inset 0 0 55px #43f5ff14,0 0 35px #43f5ff2a;position:relative}
+#book:before{content:"";position:absolute;left:34px;top:0;bottom:0;width:2px;background:#43f5ff44}
+.bt{display:flex;align-items:center;gap:12px;padding:12px 16px 12px 52px;border-bottom:1px solid #43f5ff55}
+.bt b{font:700 clamp(14px,2.4vw,20px) Silkscreen,monospace;color:var(--cy);flex:1}
+#pg{flex:1;overflow:auto;padding:18px 22px 18px 52px;line-height:1.65;font-size:clamp(12px,1.5vw,15px);color:#bafaff}
+#pg h3{font:700 clamp(13px,2vw,17px) Silkscreen,monospace;color:#ff5269;margin:0 0 10px}
+#pg li{margin-bottom:5px}#pg em{color:var(--am);font-style:normal}#pg b{color:#fff}
+#pg pre{background:#020a14;border:1px solid #43f5ff40;padding:10px;color:var(--cy);overflow:auto;font-size:13px}
+#pg table{width:100%;border-collapse:collapse;font-size:clamp(11px,1.3vw,14px)}
+#pg td,#pg th{border:1px solid #43f5ff40;padding:6px 8px;text-align:left;vertical-align:top}#pg th{color:var(--cy);background:#06203320}#pg td:nth-child(3),#pg th:nth-child(3){color:#ff9ba8}
+.bf{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 10px 52px;border-top:1px solid #43f5ff55;font-size:12px;color:#74dce9}
+@media(max-width:560px){.node{width:64px;height:64px;font-size:9px}.ninja{width:64px;height:64px;bottom:calc(14% + 66px)}.cable{left:76px;right:76px}#lane{left:88px;right:88px}.panel{grid-template-columns:1fr}#ctl{justify-content:stretch}#ctl button{flex:1}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+</style></head>
+<body data-m="0">
+<div class="w box hud"><span class="ttl">NETHERIA // PACKET RUN</span><div id="pips"></div><span class="sp"></span><span id="stat"></span><button id="info" title="Field guide (I)">i</button></div>
+
+<div class="w stage" id="stage">
+  <div class="node" id="cl">CLIENT<br>YOU</div><div class="node" id="sv">SERVER<br>VAULT</div>
+  <div class="ninja" id="nj"></div><div class="cable"></div><div class="noise">NOISE</div>
+  <div id="lane"></div>
+  <div id="sortbox"><div class="k">Incoming request</div><div id="sq"></div><div id="sb"><button data-c="TCP">TCP [T]</button><button class="u" data-c="UDP">UDP [U]</button></div><div id="sa"></div><button id="nx">Next ▶</button></div>
+</div>
+
+<div class="w box">
+  <div class="panel"><div><div id="fb">Press I any time to open the field guide.</div><div id="cp"></div></div>
+    <div id="ctl"><button id="retx">↺ Retransmit [R]</button><button id="send">▶ Send packet [Space]</button></div></div>
+</div>
+<div class="hint">SPACE send · R retransmit · T / U route · I field guide · Enter continue</div>
+
+<section id="ov"><div class="card"><div class="k" id="ovk"></div><h2 id="ovt"></h2><p id="ovb"></p><button id="ok"></button></div></section>
+
+<section id="bk"><div id="book"><div class="bt"><b>FIELD GUIDE // TCP &amp; UDP</b><button id="bx">✕ Close [I]</button></div><div id="pg"></div>
+<div class="bf"><button id="bp">◀ Prev</button><span id="bn"></span><button id="bnx">Next ▶</button></div></div></section>
+
+<script>
+(()=>{
+const $=s=>document.querySelector(s),rnd=(a,b)=>a+Math.random()*(b-a),lane=$('#lane'),cp=$('#cp');
+let R=-1,st={},pkts=[],ovOn=false,ovCb=null,bkOn=false,pgI=0;
+
+/* ---------- ninja ---------- */
+const FR={};
+['idle','run','win','hurt','hack'].forEach(n=>{const i=new Image();i.onload=()=>{FR[n]=Math.max(1,Math.round(i.naturalWidth/48));if(n==='idle')pose('idle')};i.src='assets/ninja-'+n+'.png'});
+function pose(n,ms){const e=$('#nj');e.style.backgroundImage='url(assets/ninja-'+n+'.png)';e.style.setProperty('--n',FR[n]||6);clearTimeout(pose.t);if(ms)pose.t=setTimeout(()=>pose('idle'),ms)}
+
+/* ---------- helpers ---------- */
+const stat=t=>$('#stat').textContent=t,fb=(t,c)=>{$('#fb').textContent=t;$('#fb').className=c||''};
+const pips=()=>$('#pips').innerHTML=[0,1,2].map(i=>`<i class="${i<R?'on':i===R?'now':''}"></i>`).join('');
+function card(k,t,b,btn,cb){$('#ovk').textContent=k;$('#ovt').textContent=t;$('#ovb').innerHTML=b;$('#ok').textContent=btn;ovCb=cb;ovOn=true;$('#ov').classList.add('on')}
+$('#ok').onclick=()=>{$('#ov').classList.remove('on');ovOn=false;ovCb&&ovCb()};
+function spawn(label,dur,dieAt,dir,cls,arr,lost){const el=document.createElement('div');el.className='pk '+(cls||'');el.textContent=label;el.style.setProperty('--y',rnd(-24,24)+'px');lane.appendChild(el);pkts.push({el,t:0,dur,dieAt,dir,arr,lost})}
+function step(dt){for(const p of pkts){p.t+=dt/p.dur;p.el.style.left=(p.dir>0?p.t:1-p.t)*100+'%';
+ if(p.dieAt!=null&&p.t>=p.dieAt){p.dead=1;p.el.classList.add('x');setTimeout(()=>p.el.remove(),420);p.lost&&p.lost()}
+ else if(p.t>=1){p.dead=1;p.el.remove();p.arr&&p.arr()}}
+ pkts=pkts.filter(p=>!p.dead)}
+const clear=()=>{lane.innerHTML='';pkts=[];cp.innerHTML='';st={}};
+
+/* ---------- ROUND 1: UDP stream ---------- */
+const udp={
+ intro:['Round 1 / 3','UDP — LIVE STREAM','The warden’s camera feed is live. Hammer <b>SPACE</b> to fire packets down the cable — no handshake, no waiting, no ACKs. The noise zone eats roughly 1 in 3 packets and the rest arrive with random delay. Get <b>30 packets</b> through in <b>15 seconds</b>.'],
+ start(){clear();document.body.dataset.m=1;st={on:1,t:15,sent:0,got:0,lost:0,ooo:0,max:0,cd:0,over:0};cp.innerHTML='<small>SERVER RECEIVED:</small>';fb('Fire! Fire! Fire!')},
+ send(){if(st.cd>0||st.over)return;st.cd=.16;const s=++st.sent;pose('run',160);
+  spawn(s,rnd(.8,1.9),Math.random()<.3?rnd(.46,.55):null,1,'',()=>{st.got++;const o=s<st.max;st.max=Math.max(st.max,s);if(o)st.ooo++;
+   const c=document.createElement('span');c.className='c'+(o?' ooo':' ok');c.textContent=s;cp.appendChild(c);while(cp.children.length>19)cp.children[1].remove()},
+  ()=>{st.lost++;pose('hurt',200)})},
+ tick(dt){st.cd-=dt;if(!st.over){st.t-=dt;if(st.t<=0){st.t=0;st.over=1;fb('Time! Waiting for packets still on the wire…')}}
+  stat(`TIME ${st.t.toFixed(1)}s · DELIVERED ${st.got}/30 · LOST ${st.lost} · OUT OF ORDER ${st.ooo}`);
+  if(st.over&&!pkts.length){st.on=0;st.got>=30?win(0,`UDP is <b>fire-and-forget</b>: ${st.sent} sent, ${st.lost} lost, ${st.ooo} arrived out of order — and nobody resent anything. That is fine for live video, voice and games, where speed beats perfection.`):lose(`Only ${st.got}/30 packets got through. UDP doesn’t retry, so send faster!`,()=>udp.start())}}
+};
+
+/* ---------- ROUND 2: TCP vault file ---------- */
+const tcp={
+ intro:['Round 2 / 3','TCP — THE VAULT FILE','The vault file has <b>8 packets</b> and every one must arrive. <b>SPACE</b> sends the next packet, but only <b>3</b> may be unacknowledged at once (the window). The server answers each arrival with an ACK. If an ACK doesn’t come back before the timeout, the packet turns <b>red</b> — press <b>R</b> (or tap it) to retransmit.'],
+ start(){clear();document.body.dataset.m=2;st={on:1,s:Array(9).fill('new'),tm:[],tried:[],got:[],exp:1,sends:0};this.draw();fb('Send packet #1 to begin.')},
+ draw(){cp.innerHTML='<small>SEND WINDOW:</small>';for(let i=1;i<=8;i++){const c=document.createElement('span');c.className='c '+st.s[i];c.textContent='#'+i;c.onclick=()=>this.retx(i);cp.appendChild(c)}},
+ fly:()=>st.s.filter(x=>x==='fly').length,
+ send(){if(!st.on)return;const n=st.s.indexOf('new',1);if(n<0)return fb('Nothing new left — retransmit red packets (R) or wait for ACKs.');
+  if(this.fly()>=3)return fb('Window full — 3 packets in flight. Wait for ACKs!','bad');this.tx(n)},
+ tx(n){const re=st.tried[n];st.tried[n]=1;st.s[n]='fly';st.tm[n]=3;st.sends++;pose('run',160);this.draw();
+  spawn(n,1.1,Math.random()<(re?.15:.35)?rnd(.46,.55):null,1,'',()=>{st.got[n]=1;while(st.got[st.exp])st.exp++;
+   spawn('ACK '+n,.7,null,-1,'ack',()=>{if(st.on&&st.s[n]!=='ok'){st.s[n]='ok';this.draw();pose('hack',200);if(st.s.slice(1).every(x=>x==='ok')){st.on=0;win(1,`TCP made delivery <b>reliable</b>: sequence numbers, ACKs and retransmission got all 8 packets across in order (${st.sends} sends for 8 packets). The price is waiting — perfect for web pages, e-mail and file transfers.`)}}})},
+  ()=>fb('Packet #'+n+' was dropped in the noise… wait for its timeout.'))},
+ retx(n){if(!st.on)return;n=n||st.s.indexOf('to',1);if(n<1||st.s[n]!=='to')return fb('Nothing has timed out yet.');this.tx(n);fb('Retransmitting #'+n+'…','good')},
+ tick(dt){for(let i=1;i<=8;i++)if(st.s[i]==='fly'&&(st.tm[i]-=dt)<=0){st.s[i]='to';this.draw();pose('hurt',300);fb(`TIMEOUT on #${i} — no ACK! Press R to retransmit.`,'bad')}
+  stat(`IN ORDER ${st.exp-1}/8 · IN FLIGHT ${this.fly()}/3 · SENDS ${st.sends}`)}
+};
+
+/* ---------- ROUND 3: protocol router ---------- */
+const POOL=[['Live video call','UDP','A late frame is useless — skip it and stay live.'],['Bank transfer','TCP','Every byte must arrive, in order, exactly once.'],['Online shooter: player positions','UDP','The next update replaces a lost one; resending old data only adds lag.'],['Downloading a game installer','TCP','One missing chunk corrupts the whole file.'],['DNS lookup','UDP','A tiny question and answer in one packet — just ask again if it’s lost.'],['Sending an e-mail (SMTP)','TCP','The message must arrive complete and intact.'],['Voice chat (VoIP)','UDP','Real-time audio can’t wait for retransmissions.'],['Opening a secure web page (HTTPS)','TCP','Pages need reliable, ordered delivery.'],['Remote login (SSH)','TCP','Every keystroke and reply must be exact and in order.'],['Live sports stream','UDP','Keep the stream moving; a glitch beats a freeze.']];
+const sort={
+ intro:['Round 3 / 3','PROTOCOL ROUTER','Requests are hitting the router. Send each one down the right protocol: <b>TCP</b> (T) or <b>UDP</b> (U). You have <b>3 lives</b> — six requests to go.'],
+ start(){clear();document.body.dataset.m=3;st={on:1,q:POOL.slice().sort(()=>Math.random()-.5).slice(0,6),i:0,lv:3,lk:0};this.card()},
+ card(){st.lk=0;$('#sq').textContent=st.q[st.i][0];$('#sa').textContent='';$('#sa').className='';$('#nx').style.display='none';$('#sb').style.display='flex';this.hud();fb('Which protocol fits?')},
+ hud(){stat(`REQUEST ${st.i+1}/6 · LIVES ${'♥'.repeat(st.lv)||'—'}`)},
+ ans(c){if(!st.on||st.lk)return;st.lk=1;const q=st.q[st.i],ok=c===q[1];ok?pose('hack',400):(st.lv--,pose('hurt',400));
+  $('#sa').className=ok?'good':'bad';$('#sa').textContent=(ok?'✔ Correct — ':'✘ That one is '+q[1]+' — ')+q[2];$('#sb').style.display='none';$('#nx').style.display='block';this.hud()},
+ next(){if(!st.lk)return;if(st.lv<=0){st.on=0;return lose('Out of lives! Re-read the field guide (I) and try again.',()=>sort.start())}
+  if(++st.i>=6){st.on=0;return win(2,'You can now pick the right tool: <b>TCP</b> when every byte matters, <b>UDP</b> when speed matters more than perfection.')}this.card()},
+ tick(){}
+};
+const RD=[udp,tcp,sort];
+document.querySelectorAll('#sb button').forEach(b=>b.onclick=()=>sort.ans(b.dataset.c));$('#nx').onclick=()=>sort.next();
+
+/* ---------- flow ---------- */
+function begin(i){R=i;pips();clear();document.body.dataset.m=0;stat('');const d=RD[i].intro;card(d[0],d[1],d[2],'Start',()=>RD[i].start())}
+function win(i,msg){pose('win',1500);card('Round clear','✔ '+['UDP STREAM','TCP TRANSFER','ROUTER'][i]+' COMPLETE',msg,i<2?'Next round ▶':'Finish ▶',()=>i<2?begin(i+1):finish())}
+function lose(msg,cb){st.on=0;pose('hurt',600);card('Round failed','CONNECTION LOST',msg,'Retry ↺',cb)}
+function finish(){R=3;pips();pose('win');card('All protocols routed','PACKET RUN COMPLETE','UDP fires fast and forgets; TCP delivers every byte in order. You’ve mastered both. The network is waiting.','Continue ▶',()=>parent.postMessage({type:'netheria:complete',scene:'packets'},'*'))}
+
+/* ---------- field guide (book) ---------- */
+const PG=[
+['THE TRANSPORT LAYER (LAYER 4)',`<p><b>IP</b> (layer 3) delivers a packet to the right <em>computer</em>. The <b>transport layer</b> delivers the data to the right <em>program</em> on that computer, using <b>port numbers</b> (0–65535). Think of the IP address as the building and the port as the apartment number.</p><ul><li>Port <em>443</em> → HTTPS web server</li><li>Port <em>53</em> → DNS</li><li>Port <em>25</em> → e-mail (SMTP)</li></ul><p>Two protocols do the job. <b>TCP</b> is the careful courier. <b>UDP</b> is the fast flyer. Each message gets a small <em>header</em> with ports and a checksum to catch corruption. TCP data units are called <em>segments</em>, UDP’s are <em>datagrams</em>.</p>`],
+['TCP — TRANSMISSION CONTROL PROTOCOL',`<p><b>Connection-oriented and reliable.</b> Before any data moves, the two sides open a connection with the <em>three-way handshake</em> (you did this in the Transport room):</p><pre>CLIENT              SERVER
+  | ---- SYN -----&gt;  |   "can we talk?"
+  | &lt;-- SYN-ACK ---  |   "yes, can you hear me?"
+  | ---- ACK -----&gt;  |   "loud and clear"</pre><ul><li><b>Sequence numbers</b> number every byte so data can be put back in order.</li><li><b>ACKs</b> confirm arrival; no ACK before the <em>timeout</em> → <b>retransmit</b>.</li><li><b>Flow control</b> (the window) stops a fast sender flooding a slow receiver.</li><li><b>Congestion control</b> slows down when the network is jammed.</li><li>Connection closes politely with <b>FIN</b>.</li></ul><p>Header: 20–60 bytes. Used by: web (HTTP/HTTPS), e-mail, SSH, file transfer.</p>`],
+['UDP — USER DATAGRAM PROTOCOL',`<p><b>Connectionless and lightweight.</b> No handshake: just address the datagram and send it.</p><ul><li>No ACKs, no retransmission: a lost datagram is simply <em>gone</em>.</li><li>No ordering: datagrams may arrive <em>out of order</em> or twice.</li><li>No congestion control: it sends as fast as the app asks.</li><li>Still has a <b>checksum</b> to detect damaged data.</li><li>Supports <b>broadcast</b> and <b>multicast</b> (one sender, many receivers).</li></ul><p>Header: only <em>8 bytes</em> (source port, destination port, length, checksum).</p><p>Used by: <b>DNS</b>, <b>voice and video calls</b>, <b>live streaming</b>, <b>online games</b>, DHCP. Modern QUIC (behind HTTP/3) is built on top of UDP and adds its own reliability.</p>`],
+['HEAD TO HEAD',`<table><tr><th></th><th>TCP</th><th>UDP</th></tr><tr><td>Connection</td><td>Handshake first</td><td>None</td></tr><tr><td>Delivery</td><td>Guaranteed (ACK + retransmit)</td><td>Best effort</td></tr><tr><td>Order</td><td>Kept in order</td><td>Can be scrambled</td></tr><tr><td>Speed / latency</td><td>Slower, more overhead</td><td>Fast, low overhead</td></tr><tr><td>Header size</td><td>20–60 bytes</td><td>8 bytes</td></tr><tr><td>Congestion control</td><td>Yes</td><td>No</td></tr><tr><td>Best for</td><td>Web, e-mail, files, banking</td><td>Calls, streams, games, DNS</td></tr></table><p><em>Rule of thumb:</em> if a missing piece ruins everything, use TCP. If a late piece is worthless, use UDP.</p>`],
+['FIELD NOTES — PACKET RUN',`<ul><li><b>Round 1 (UDP):</b> spam <em>SPACE</em>. About 30% of packets die in the noise and arrivals get shuffled (amber chips). Nothing is resent — that’s UDP. Beat the clock.</li><li><b>Round 2 (TCP):</b> only <em>3 packets</em> may be in flight (window). Every send needs an ACK. A red packet = timeout → press <em>R</em> or tap it to retransmit. All 8 must arrive.</li><li><b>Round 3 (Router):</b> pick TCP or UDP for six real-world requests. Three lives.</li></ul><p>Stuck? Ask yourself: <em>does a lost packet matter, or does waiting matter?</em></p>`]];
+function bookPage(){$('#pg').innerHTML=`<h3>${PG[pgI][0]}</h3>`+PG[pgI][1];$('#pg').scrollTop=0;$('#bn').textContent=`Page ${pgI+1} / ${PG.length}`;$('#bp').disabled=!pgI;$('#bnx').disabled=pgI===PG.length-1}
+function book(on){bkOn=on;$('#bk').classList.toggle('on',on);if(on)bookPage()}
+$('#info').onclick=()=>book(true);$('#bx').onclick=()=>book(false);$('#bp').onclick=()=>{pgI--;bookPage()};$('#bnx').onclick=()=>{pgI++;bookPage()};
+$('#bk').addEventListener('click',e=>{if(e.target.id==='bk')book(false)});
+
+/* ---------- input ---------- */
+$('#send').onclick=()=>!ovOn&&R>=0&&R<2&&st.on&&RD[R].send();$('#retx').onclick=()=>R===1&&tcp.retx();
+addEventListener('click',e=>{if(e.target.matches&&e.target.matches('button'))e.target.blur()});
+addEventListener('keydown',e=>{const k=e.code;
+ if(k==='KeyI'){book(!bkOn);return}
+ if(bkOn){if(k==='Escape')book(false);if(k==='ArrowRight'&&pgI<PG.length-1){pgI++;bookPage()}if(k==='ArrowLeft'&&pgI>0){pgI--;bookPage()}return}
+ if(ovOn){if(k==='Enter'||k==='Space'){e.preventDefault();$('#ok').click()}return}
+ if(!st.on)return;
+ if(k==='Space'||k==='Enter'){e.preventDefault();R<2?RD[R].send():sort.next()}
+ if(k==='KeyR'&&R===1)tcp.retx();
+ if(R===2){if(k==='KeyT')sort.ans('TCP');if(k==='KeyU')sort.ans('UDP')}});
+addEventListener('blur',()=>{});
+
+let last=0;
+(function loop(now){const dt=Math.min((now-(last||now))/1000,.05);last=now;if(R>=0&&R<3&&!ovOn&&st.on)RD[R].tick(dt);step(dt);requestAnimationFrame(loop)})(0);
+pips();begin(0);
+})();
+</script></body></html>

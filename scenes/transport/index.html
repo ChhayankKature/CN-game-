@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Netheria — Transport Layer</title>
+<style>
+:root{--cyan:#43f5ff;--red:#ff315f;--ink:#050713}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--ink);color:#e6fcff;font-family:Consolas,monospace}
+canvas{display:block;width:100vw;height:100dvh;image-rendering:pixelated}
+.hud{position:fixed;z-index:2;background:#040818e8;border:1px solid var(--cyan);padding:10px 12px;box-shadow:0 0 14px #00dfff35;text-transform:uppercase;letter-spacing:.05em}
+#brand{left:12px;top:12px;color:var(--cyan);font-size:12px;font-weight:bold}#mission{right:12px;top:12px;font-size:10px;line-height:1.6;text-align:right}
+#hint{left:12px;bottom:12px;font-size:10px;line-height:1.7}
+#open{display:none;position:fixed;z-index:3;left:50%;bottom:15%;transform:translateX(-50%);padding:12px 16px;background:#061526f2;border:2px solid var(--cyan);color:var(--cyan);font:bold 12px Consolas;cursor:pointer;box-shadow:0 0 20px #00dfff66}#open.show{display:block}
+#panel{display:none;position:fixed;z-index:5;left:50%;top:50%;transform:translate(-50%,-50%);width:min(660px,calc(100vw - 24px));max-height:90dvh;overflow:auto;background:#05091bf7;border:2px solid var(--cyan);box-shadow:0 0 0 4px #06101d,0 0 36px #00dfff55;padding:clamp(14px,3vw,25px)}
+#panel.show{display:block}h1{font-size:clamp(18px,4vw,26px);color:var(--cyan);margin:0 0 8px}.desc{font-size:12px;line-height:1.6;color:#bceef3}
+#slots,#signals{display:flex;gap:8px;flex-wrap:wrap;margin:15px 0}.slot{flex:1;min-width:95px;min-height:70px;border:1px dashed #3e6676;background:#0a1327;padding:8px;text-align:center;display:flex;flex-direction:column;justify-content:center;gap:8px;font-size:11px}.slot strong{color:var(--cyan);font-size:15px}.slot.filled{border-style:solid;border-color:var(--cyan)}
+.signal,.action{cursor:pointer;font:bold 12px Consolas,monospace;text-transform:uppercase;padding:12px;background:#11152b;color:#fff;border:1px solid var(--red)}.signal{flex:1;min-width:115px;text-align:left}.signal small{display:block;color:#ff9bb1;font-weight:normal;margin-top:6px}.signal:disabled{opacity:.35;cursor:default}.action{border-color:var(--cyan);color:var(--cyan);background:#0a2331;margin:3px}
+#feedback{min-height:32px;font-size:12px;line-height:1.6;margin:10px 0}.good{color:#75ffcf!important}.bad{color:#ff819a!important}
+#touch{position:fixed;z-index:2;right:12px;bottom:12px;display:flex;gap:8px}#touch button{display:none;background:#061526d9;color:var(--cyan);border:1px solid var(--cyan);padding:12px;font:bold 14px Consolas}
+@media(pointer:coarse){#touch button{display:block}#hint{bottom:68px}}@media(max-width:500px){#mission{max-width:48vw;font-size:9px}#brand{font-size:10px}.slot{min-width:75px}}
+</style></head>
+<body>
+<canvas id="game"></canvas>
+<div id="brand" class="hud">NETHERIA // TRANSPORT LAYER</div>
+<div id="mission" class="hud">MISSION: OPEN THE VAULT<br>Establish a trusted connection.</div>
+<div id="hint" class="hud">MOVE: A / D OR ← / →<br>REACH THE MIDDLE · PRESS E TO OPEN TERMINAL</div>
+<div id="touch"><button id="left">◀</button><button id="right">▶</button><button id="interact">E / TERMINAL</button></div>
+<button id="open">[ E ] GO TO TERMINAL</button>
+<section id="panel">
+<h1>SECURE LINK // TCP HANDSHAKE</h1>
+<p class="desc">The vault is sealed. Establish a reliable TCP connection by transmitting the three signals in the correct order.</p>
+<div id="slots"><div class="slot"><b>01 / REQUEST</b><span>Awaiting signal</span></div><div class="slot"><b>02 / RESPONSE</b><span>Awaiting signal</span></div><div class="slot"><b>03 / CONFIRM</b><span>Awaiting signal</span></div></div>
+<div id="signals"><button class="signal" data-s="ACK">ACK<small>Acknowledge the connection</small></button><button class="signal" data-s="SYN">SYN<small>Request a connection</small></button><button class="signal" data-s="SYN-ACK">SYN-ACK<small>Acknowledge + respond</small></button></div>
+<div id="feedback">Choose the first signal.</div>
+<button class="action" id="check">Transmit sequence</button><button class="action" id="reset">Reset</button><button class="action" id="close">Return to room</button>
+</section>
+<script>
+(()=> {
+const canvas=document.querySelector('#game'),ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=false;
+const room=new Image();room.src='assets/transport-room.png';
+const sprites={idle:new Image(),run:new Image(),win:new Image()};
+sprites.idle.src='assets/ninja-idle.png';sprites.run.src='assets/ninja-run.png';sprites.win.src='assets/ninja-win.png';
+const keys=new Set(), player={x:200,w:48,h:48,face:1,frame:0};let ground=0,camera=0,last=0,world=1672,terminal=836,opened=false,won=false,seq=[],touchLeft=false,touchRight=false;
+const panel=document.querySelector('#panel'),openBtn=document.querySelector('#open'),feedback=document.querySelector('#feedback');
+function resize(){const d=Math.min(devicePixelRatio||1,2);canvas.width=innerWidth*d;canvas.height=innerHeight*d;ctx.setTransform(d,0,0,d,0,0);ground=innerHeight*.89}addEventListener('resize',resize);resize();
+addEventListener('keydown',e=>{if(['ArrowLeft','ArrowRight','Space'].includes(e.code))e.preventDefault();if(e.code==='KeyE'&&!opened&&!won&&Math.abs(player.x-terminal)<175)show();if(e.code==='Escape'&&opened)hide();keys.add(e.code)});
+addEventListener('keyup',e=>keys.delete(e.code));addEventListener('blur',()=>keys.clear());
+function show(){opened=true;panel.classList.add('show');openBtn.classList.remove('show');keys.clear()}function hide(){opened=false;panel.classList.remove('show')}
+openBtn.onclick=show;document.querySelector('#close').onclick=hide;
+function bindHold(id,code){const el=document.querySelector(id);el.addEventListener('pointerdown',e=>{e.preventDefault();keys.add(code)});['pointerup','pointercancel','pointerleave'].forEach(ev=>el.addEventListener(ev,()=>keys.delete(code)))}
+bindHold('#left','ArrowLeft');bindHold('#right','ArrowRight');document.querySelector('#interact').onclick=()=>{if(Math.abs(player.x-terminal)<175&&!won)show()};
+function render(){document.querySelectorAll('.slot').forEach((el,i)=>{const v=seq[i];el.classList.toggle('filled',!!v);el.innerHTML=`<b>0${i+1} / ${['REQUEST','RESPONSE','CONFIRM'][i]}</b>`+(v?`<strong>${v}</strong>`:'<span>Awaiting signal</span>')});document.querySelectorAll('.signal').forEach(b=>b.disabled=seq.includes(b.dataset.s)||seq.length>=3)}
+document.querySelectorAll('.signal').forEach(b=>b.onclick=()=>{if(seq.length<3){seq.push(b.dataset.s);render();feedback.className='';feedback.textContent='Signal selected. Choose the next one.'}});
+document.querySelector('#reset').onclick=()=>{seq=[];render();feedback.className='';feedback.textContent='Choose the first signal.'};
+document.querySelector('#check').onclick=()=>{if(seq.length!==3){feedback.className='bad';feedback.textContent='Connection incomplete. Select all three signals.'}else if(seq.join(',')==='SYN,SYN-ACK,ACK'){won=true;feedback.className='good';feedback.textContent='HANDSHAKE COMPLETE. VAULT UNLOCKED.';document.querySelector('#mission').innerHTML='CONNECTION ESTABLISHED<br>TCP HANDSHAKE COMPLETE';document.querySelector('#hint').innerHTML='TRANSPORT LAYER RESTORED<br>PING SIGNAL LOCATED';document.querySelectorAll('.signal').forEach(b=>b.disabled=true);setTimeout(hide,1700);setTimeout(()=>{parent.postMessage({type:'netheria:complete',scene:'transport'},'*')},3300)}else{feedback.className='bad';feedback.textContent='Rejected. TCP order: SYN → SYN-ACK → ACK. Reset and try again.'}};
+function sprite(im,dx,dy,dw,dh,frame,flip){if(!im.complete||!im.naturalWidth)return;const count=Math.max(1,Math.round(im.naturalWidth/48)),fw=im.naturalWidth/count;ctx.save();if(flip){ctx.translate(dx+dw,0);ctx.scale(-1,1);dx=0}ctx.drawImage(im,(Math.floor(frame)%count)*fw,0,fw,im.naturalHeight,dx,dy,dw,dh);ctx.restore()}
+const IW=1672,IH=941,FLOOR=712,SZ=150,FEET=.9375,SPEED=330;
+function loop(now){const dt=Math.min((now-(last||now))/1000,.04);last=now;const w=innerWidth,h=innerHeight;ctx.clearRect(0,0,w,h);ctx.fillStyle='#050713';ctx.fillRect(0,0,w,h);
+const sc=Math.min(w/IW,h/IH),ox=(w-IW*sc)/2,oy=(h-IH*sc)/2;
+if(room.complete&&room.naturalWidth)ctx.drawImage(room,ox,oy,IW*sc,IH*sc);
+let moving=false;if(!opened&&!won){if(keys.has('ArrowLeft')||keys.has('KeyA')){player.x-=SPEED*dt;player.face=-1;moving=true}if(keys.has('ArrowRight')||keys.has('KeyD')){player.x+=SPEED*dt;player.face=1;moving=true}}
+player.x=Math.max(70,Math.min(IW-70,player.x));player.frame+=dt*(moving?12:5);
+if(!won&&Math.abs(player.x-terminal)<175){const cx=ox+terminal*sc,cy=oy+540*sc,r=170*sc;const glow=ctx.createRadialGradient(cx,cy,5,cx,cy,r);glow.addColorStop(0,'rgba(67,245,255,.26)');glow.addColorStop(1,'rgba(67,245,255,0)');ctx.fillStyle=glow;ctx.fillRect(cx-r,cy-r,r*2,r*2)}
+const dw=SZ*sc,dx=ox+player.x*sc-dw/2,dy=oy+FLOOR*sc-dw*FEET;
+ctx.save();ctx.globalAlpha=.35;ctx.fillStyle='#000';ctx.beginPath();ctx.ellipse(ox+player.x*sc,oy+FLOOR*sc,dw*.22,dw*.045,0,0,7);ctx.fill();ctx.restore();
+sprite(won?sprites.win:(moving?sprites.run:sprites.idle),dx,dy,dw,dw,player.frame,player.face<0);
+openBtn.classList.toggle('show',!won&&!opened&&Math.abs(player.x-terminal)<175);requestAnimationFrame(loop)}
+render();requestAnimationFrame(loop);
+})();
+</script></body></html>
